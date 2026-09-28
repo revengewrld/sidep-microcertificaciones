@@ -1,0 +1,192 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+enum Rol {
+  ESTUDIANTE
+  INSTRUCTOR
+  ADMINISTRADOR
+}
+
+model Usuario {
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  cedula      String?
+  correo      String   @unique
+  contraseña  String
+  rol         Rol      @default(ESTUDIANTE)
+  activo      Boolean  @default(true)
+  creadoEn    DateTime @default(now())
+    talleres      Taller[]
+  inscripciones Inscripcion[]
+    resultadosTaller ResultadoTaller[]
+  resultadosExamen ResultadoExamen[]
+  certificados Certificado[]
+  tokensRecuperacion TokenRecuperacion[]
+  entregas Entrega[]
+}
+model Microcertificacion {
+  id            Int      @id @default(autoincrement())
+  titulo        String
+  descripcion   String
+  duracionHoras Int      @default(20)
+  categoria     String
+  precio        Decimal  @default(0) @db.Decimal(10, 2)
+  imagenUrl     String?
+  documentoUrl  String?
+  publicado     Boolean  @default(false)
+  creadoEn      DateTime @default(now())
+     talleres      Taller[]
+  inscripciones Inscripcion[]
+  examenFinal   ExamenFinal?
+  certificados  Certificado[]
+}
+model Taller {
+  id                    Int      @id @default(autoincrement())
+  titulo                String
+  descripcion           String
+  orden                 Int      @default(0)
+  videoUrl              String?
+  microcertificacionId  Int
+  microcertificacion    Microcertificacion @relation(fields: [microcertificacionId], references: [id])
+  instructorId          Int?
+  instructor            Usuario? @relation(fields: [instructorId], references: [id])
+  creadoEn              DateTime @default(now())
+  preguntas  Pregunta[]
+  resultados ResultadoTaller[]
+  entregas   Entrega[]
+}
+
+model Inscripcion {
+  id                     Int                @id @default(autoincrement())
+  usuarioId              Int
+  usuario                Usuario            @relation(fields: [usuarioId], references: [id])
+  microcertificacionId   Int
+  microcertificacion     Microcertificacion @relation(fields: [microcertificacionId], references: [id])
+  inscritoEn             DateTime           @default(now())
+  documentoConfirmado    Boolean            @default(false)
+
+  @@unique([usuarioId, microcertificacionId])
+}
+enum TipoPregunta {
+  OPCION_MULTIPLE
+  VERDADERO_FALSO
+}
+
+model Pregunta {
+  id        Int          @id @default(autoincrement())
+  tallerId  Int
+  taller    Taller       @relation(fields: [tallerId], references: [id])
+  texto     String
+  tipo      TipoPregunta @default(OPCION_MULTIPLE)
+  orden     Int          @default(0)
+  opciones  Opcion[]
+  creadoEn  DateTime     @default(now())
+}
+
+model Opcion {
+  id         Int      @id @default(autoincrement())
+  preguntaId Int
+  pregunta   Pregunta @relation(fields: [preguntaId], references: [id])
+  texto      String
+  esCorrecta Boolean  @default(false)
+}
+
+model ResultadoTaller {
+  id            Int      @id @default(autoincrement())
+  usuarioId     Int
+  usuario       Usuario  @relation(fields: [usuarioId], references: [id])
+  tallerId      Int
+  taller        Taller   @relation(fields: [tallerId], references: [id])
+  calificacion  Decimal  @db.Decimal(5, 2)
+  aprobado      Boolean  @default(false)
+  intentoNumero Int      @default(1)
+  realizadoEn   DateTime @default(now())
+
+  @@index([usuarioId, tallerId])
+}
+
+model ExamenFinal {
+  id                    Int      @id @default(autoincrement())
+  microcertificacionId  Int      @unique
+  microcertificacion    Microcertificacion @relation(fields: [microcertificacionId], references: [id])
+  preguntas             PreguntaExamen[]
+  resultados            ResultadoExamen[]
+  creadoEn              DateTime @default(now())
+}
+
+model PreguntaExamen {
+  id            Int          @id @default(autoincrement())
+  examenFinalId Int
+  examenFinal   ExamenFinal  @relation(fields: [examenFinalId], references: [id])
+  texto         String
+  tipo          TipoPregunta @default(OPCION_MULTIPLE)
+  orden         Int          @default(0)
+  opciones      OpcionExamen[]
+  creadoEn      DateTime     @default(now())
+}
+
+model OpcionExamen {
+  id               Int            @id @default(autoincrement())
+  preguntaExamenId Int
+  preguntaExamen   PreguntaExamen @relation(fields: [preguntaExamenId], references: [id])
+  texto            String
+  esCorrecta       Boolean        @default(false)
+}
+
+model ResultadoExamen {
+  id            Int         @id @default(autoincrement())
+  usuarioId     Int
+  usuario       Usuario     @relation(fields: [usuarioId], references: [id])
+  examenFinalId Int
+  examenFinal   ExamenFinal @relation(fields: [examenFinalId], references: [id])
+  calificacion  Decimal     @db.Decimal(5, 2)
+  aprobado      Boolean     @default(false)
+  intentoNumero Int         @default(1)
+  realizadoEn   DateTime    @default(now())
+
+  @@index([usuarioId, examenFinalId])
+}
+
+model Certificado {
+  id                    Int      @id @default(autoincrement())
+  codigo                String   @unique @default(uuid())
+  usuarioId              Int
+  usuario                Usuario            @relation(fields: [usuarioId], references: [id])
+  microcertificacionId   Int
+  microcertificacion     Microcertificacion @relation(fields: [microcertificacionId], references: [id])
+  emitidoEn              DateTime @default(now())
+
+  @@unique([usuarioId, microcertificacionId])
+}
+
+model TokenRecuperacion {
+  id         Int      @id @default(autoincrement())
+  token      String   @unique @default(uuid())
+  usuarioId  Int
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id])
+  expiraEn   DateTime
+  usado      Boolean  @default(false)
+  creadoEn   DateTime @default(now())
+}
+
+model Entrega {
+  id                Int      @id @default(autoincrement())
+  usuarioId         Int
+  usuario           Usuario  @relation(fields: [usuarioId], references: [id])
+  tallerId          Int
+  taller            Taller   @relation(fields: [tallerId], references: [id])
+  archivoUrl        String
+  nombreArchivo     String
+  comentario        String?
+  entregadoEn       DateTime @default(now())
+  revisado          Boolean  @default(false)
+  calificacion      Decimal? @db.Decimal(5, 2)
+  retroalimentacion String?
+
+  @@index([usuarioId, tallerId])
+}
